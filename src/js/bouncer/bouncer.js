@@ -78,6 +78,8 @@
 		// Custom Events
 		emitEvents: true
 
+		// Submit Events
+		submitEvents: [ 'submit' ]
 	};
 
 
@@ -792,7 +794,11 @@
 			document.removeEventListener('blur', blurHandler, true);
 			document.removeEventListener('input', inputHandler, false);
 			document.removeEventListener('click', inputHandler, false);
-			document.removeEventListener('submit', submitHandler, false);
+			if (settings.submitEvents) {
+				forEach(settings.submitEvents, function (submitEvent) {
+					document.removeEventListener(submitEvent, submitHandler, false);
+				});
+			}
 
 			// Remove all errors
 			removeAllErrors(selector, settings);
@@ -827,7 +833,11 @@
 			document.addEventListener('blur', blurHandler, true);
 			document.addEventListener('input', inputHandler, false);
 			document.addEventListener('click', inputHandler, false);
-			document.addEventListener('submit', submitHandler, false);
+			if (settings.submitEvents) {
+				forEach(settings.submitEvents, function (submitEvent) {
+					document.addEventListener(submitEvent, submitHandler, false);
+				});
+			}
 
 			// Emit custom event
 			if (settings.emitEvents) {
