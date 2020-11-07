@@ -1,7 +1,7 @@
 /*!
  * formbouncerjs v1.4.6
  * A lightweight form validation script that augments native HTML5 form validation elements and attributes.
- * (c) 2019 Chris Ferdinandi
+ * (c) 2020 Chris Ferdinandi
  * MIT License
  * http://github.com/cferdinandi/bouncer
  */
@@ -84,8 +84,10 @@
 		disableSubmit: false,
 
 		// Custom Events
-		emitEvents: true
+		emitEvents: true,
 
+		// Submit Events
+		submitEvents: [ 'submit' ]
 	};
 
 
@@ -141,21 +143,19 @@
 
 	/**
 	 * Add the `novalidate` attribute to all forms
+	 * @param {Element} form The form to use for forms to be validated
 	 * @param {Boolean} remove  If true, remove the `novalidate` attribute
 	 */
-	var addNoValidate = function (selector) {
-		forEach(document.querySelectorAll(selector), (function (form) {
-			form.setAttribute('novalidate', true);
-		}));
+	var addNoValidate = function (form) {
+		form.setAttribute('novalidate', true);
 	};
 
 	/**
 	 * Remove the `novalidate` attribute to all forms
+	 * @param {Element} form The form to use for forms to be validated
 	 */
-	var removeNoValidate = function (selector) {
-		forEach(document.querySelectorAll(selector), (function (form) {
-			form.removeAttribute('novalidate');
-		}));
+	var removeNoValidate = function (form) {
+		form.removeAttribute('novalidate');
 	};
 
 	/**
@@ -509,30 +509,47 @@
 
 		// Missing value error
 		if (errors.missingValue) {
-			return messages.missingValue[field.type] || messages.missingValue.default;
+			return field.getAttribute(settings.messageCustom + '-missing-value')
+				|| messages.missingValue[field.type]
+				|| messages.missingValue.default;
 		}
 
 		// Numbers that are out of range
 		if (errors.outOfRange) {
-			return messages.outOfRange[errors.outOfRange].replace('{max}', field.getAttribute('max')).replace('{min}', field.getAttribute('min')).replace('{length}', field.value.length);
+			var message = field.getAttribute(settings.messageCustom + '-out-of-range-' + errors.outOfRange)
+				|| field.getAttribute(settings.messageCustom + '-out-of-range')
+				|| messages.outOfRange;
+			if (typeof message !== 'string') {
+				message = message[errors.outOfRange] || messages.fallback;
+			}
+			return message.replace('{max}', field.getAttribute('max')).replace('{min}', field.getAttribute('min')).replace('{length}', field.value.length);
 		}
 
 		// Values that are too long or short
 		if (errors.wrongLength) {
-			return messages.wrongLength[errors.wrongLength].replace('{maxLength}', field.getAttribute('maxlength')).replace('{minLength}', field.getAttribute('minlength')).replace('{length}', field.value.length);
+			var message = field.getAttribute(settings.messageCustom + '-wrong-length-' + errors.wrongLength)
+				|| field.getAttribute(settings.messageCustom + '-wrong-length')
+				|| messages.wrongLength;
+			if (typeof message !== 'string') {
+				message = message[errors.wrongLength] || messages.fallback;
+			}
+			return message.replace('{maxLength}', field.getAttribute('maxlength')).replace('{minLength}', field.getAttribute('minlength')).replace('{length}', field.value.length);
 		}
 
 		// Pattern mismatch error
 		if (errors.patternMismatch) {
-			var custom = field.getAttribute(settings.messageCustom);
-			if (custom) return custom;
-			return messages.patternMismatch[field.type] || messages.patternMismatch.default;
+			return field.getAttribute(settings.messageCustom + '-pattern-mismatch')
+				|| field.getAttribute(settings.messageCustom + '-' + field.type)
+				|| messages.patternMismatch[field.type]
+				|| messages.patternMismatch.default;
 		}
 
 		// Custom validations
 		for (var test in settings.customValidations) {
 			if (settings.customValidations.hasOwnProperty(test)) {
-				if (errors[test] && messages[test]) return messages[test];
+				if (errors[test]) {
+					return field.getAttribute(settings.messageCustom + '-custom-' + test.replace(/[A-Z]/g, (function(m) { return "-" + m.toLowerCase(); }))) || messages[test] || messages.fallback;
+				}
 			}
 		}
 
@@ -657,23 +674,21 @@
 
 	/**
 	 * Remove errors from all fields
-	 * @param  {String} selector The selector for the form
+	 * @param {Element} form The form to use for forms to be validated
 	 * @param  {Object} settings The plugin settings
 	 */
-	var removeAllErrors = function (selector, settings) {
-		forEach(document.querySelectorAll(selector), (function (form) {
-			forEach(form.querySelectorAll('input, select, textarea'), (function (field) {
-				removeError(field, settings);
-			}));
+	var removeAllErrors = function (form, settings) {
+		forEach(form.querySelectorAll('input, select, textarea'), (function (field) {
+			removeError(field, settings);
 		}));
 	};
 
 	/**
 	 * The plugin constructor
-	 * @param {String} selector The selector to use for forms to be validated
+	 * @param {Element} form The form to use for forms to be validated
 	 * @param {Object} options  User settings [optional]
 	 */
-	var Constructor = function (selector, options) {
+	var Constructor = function (form, options) {
 
 		//
 		// Variables
@@ -735,7 +750,7 @@
 		var blurHandler = function (event) {
 
 			// Only run if the field is in a form to be validated
-			if (!event.target.form || !event.target.form.matches(selector)) return;
+			if (!event.target.form || !event.target.form === form) return;
 
 			// Validate the field
 			publicAPIs.validate(event.target);
@@ -748,7 +763,7 @@
 		var inputHandler = function (event) {
 
 			// Only run if the field is in a form to be validated
-			if (!event.target.form || !event.target.form.matches(selector)) return;
+			if (!event.target.form || !event.target.form === form) return;
 
 			// Only run on fields with errors
 			if (!event.target.classList.contains(settings.fieldClass)) return;
@@ -764,24 +779,22 @@
 		var submitHandler = function (event) {
 
 			// Only run on matching elements
-			if (!event.target.matches(selector)) return;
-
-			// Prevent form submission
-			event.preventDefault();
+			if (!event.target.form === form) return;
 
 			// Validate each field
 			var errors = publicAPIs.validateAll(event.target);
 
 			// If there are errors, focus on the first one
 			if (errors.length > 0) {
+				event.preventDefault();
 				errors[0].focus();
 				emitEvent(event.target, 'bouncerFormInvalid', {errors: errors});
 				return;
 			}
 
-			// Otherwise, submit if not disabled
-			if (!settings.disableSubmit) {
-				event.target.submit();
+			// Prevent form submissi if disabled
+			if (settings.disableSubmit) {
+				event.preventDefault();
 			}
 
 			// Emit custom event
@@ -800,13 +813,17 @@
 			document.removeEventListener('blur', blurHandler, true);
 			document.removeEventListener('input', inputHandler, false);
 			document.removeEventListener('click', inputHandler, false);
-			document.removeEventListener('submit', submitHandler, false);
+			if (settings.submitEvents) {
+				forEach(settings.submitEvents, (function (submitEvent) {
+					document.removeEventListener(submitEvent, submitHandler, false);
+				}));
+			}
 
 			// Remove all errors
-			removeAllErrors(selector, settings);
+			removeAllErrors(form, settings);
 
 			// Remove novalidate attribute
-			removeNoValidate(selector);
+			removeNoValidate(form);
 
 			// Emit custom event
 			if (settings.emitEvents) {
@@ -829,13 +846,17 @@
 			settings = extend(defaults, options || {});
 
 			// Add novalidate attribute
-			addNoValidate(selector);
+			addNoValidate(form);
 
 			// Event Listeners
 			document.addEventListener('blur', blurHandler, true);
 			document.addEventListener('input', inputHandler, false);
 			document.addEventListener('click', inputHandler, false);
-			document.addEventListener('submit', submitHandler, false);
+			if (settings.submitEvents) {
+				forEach(settings.submitEvents, (function (submitEvent) {
+					document.addEventListener(submitEvent, submitHandler, false);
+				}));
+			}
 
 			// Emit custom event
 			if (settings.emitEvents) {

@@ -77,6 +77,7 @@ var lazypipe = require('lazypipe');
 var rename = require('gulp-rename');
 var header = require('gulp-header');
 var package = require('./package.json');
+var gutil = require('gulp-util');
 
 // Scripts
 var jshint = require('gulp-jshint');
@@ -153,7 +154,8 @@ var buildScripts = function (done) {
 					// Grab files that aren't polyfills, concatenate them, and process them
 					src([file.path + '/*.js', '!' + file.path + '/*' + paths.scripts.polyfills])
 						.pipe(concat(file.relative + '.js'))
-						.pipe(jsTasks());
+						.pipe(jsTasks())
+						.on('error', function (err) { gutil.log(gutil.colors.red('[Error]'), err.toString()); });
 
 				}
 
