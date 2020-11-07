@@ -503,30 +503,47 @@
 
 		// Missing value error
 		if (errors.missingValue) {
-			return messages.missingValue[field.type] || messages.missingValue.default;
+			return field.getAttribute(settings.messageCustom + '-missing-value')
+				|| messages.missingValue[field.type]
+				|| messages.missingValue.default;
 		}
 
 		// Numbers that are out of range
 		if (errors.outOfRange) {
-			return messages.outOfRange[errors.outOfRange].replace('{max}', field.getAttribute('max')).replace('{min}', field.getAttribute('min')).replace('{length}', field.value.length);
+			var message = field.getAttribute(settings.messageCustom + '-out-of-range-' + errors.outOfRange)
+				|| field.getAttribute(settings.messageCustom + '-out-of-range')
+				|| messages.outOfRange;
+			if (typeof message !== 'string') {
+				message = message[errors.outOfRange] || messages.fallback;
+			}
+			return message.replace('{max}', field.getAttribute('max')).replace('{min}', field.getAttribute('min')).replace('{length}', field.value.length);
 		}
 
 		// Values that are too long or short
 		if (errors.wrongLength) {
-			return messages.wrongLength[errors.wrongLength].replace('{maxLength}', field.getAttribute('maxlength')).replace('{minLength}', field.getAttribute('minlength')).replace('{length}', field.value.length);
+			var message = field.getAttribute(settings.messageCustom + '-wrong-length-' + errors.wrongLength)
+				|| field.getAttribute(settings.messageCustom + '-wrong-length')
+				|| messages.wrongLength;
+			if (typeof message !== 'string') {
+				message = message[errors.wrongLength] || messages.fallback;
+			}
+			return message.replace('{maxLength}', field.getAttribute('maxlength')).replace('{minLength}', field.getAttribute('minlength')).replace('{length}', field.value.length);
 		}
 
 		// Pattern mismatch error
 		if (errors.patternMismatch) {
-			var custom = field.getAttribute(settings.messageCustom);
-			if (custom) return custom;
-			return messages.patternMismatch[field.type] || messages.patternMismatch.default;
+			return field.getAttribute(settings.messageCustom + '-pattern-mismatch')
+				|| field.getAttribute(settings.messageCustom + '-' + field.type)
+				|| messages.patternMismatch[field.type]
+				|| messages.patternMismatch.default;
 		}
 
 		// Custom validations
 		for (var test in settings.customValidations) {
 			if (settings.customValidations.hasOwnProperty(test)) {
-				if (errors[test] && messages[test]) return messages[test];
+				if (errors[test]) {
+					return field.getAttribute(settings.messageCustom + '-custom-' + test.replace(/[A-Z]/g, m => "-" + m.toLowerCase())) || messages[test] || messages.fallback;
+				}
 			}
 		}
 
