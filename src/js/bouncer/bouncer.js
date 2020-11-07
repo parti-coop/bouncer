@@ -785,14 +785,15 @@
 
 			// If there are errors, focus on the first one
 			if (errors.length > 0) {
+				event.preventDefault();
 				errors[0].focus();
 				emitEvent(event.target, 'bouncerFormInvalid', {errors: errors});
 				return;
 			}
 
-			// Otherwise, submit if not disabled
-			if (!settings.disableSubmit) {
-				event.target.submit();
+			// Prevent form submissi if disabled
+			if (settings.disableSubmit) {
+				event.preventDefault();
 			}
 
 			// Emit custom event
